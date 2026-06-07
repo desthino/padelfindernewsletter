@@ -119,7 +119,7 @@ const s = {
     width: '100%',
   },
   logo: {
-    height: '100px',
+    height: '0px',
     width: 'auto',
     marginBottom: '80px',
   },
