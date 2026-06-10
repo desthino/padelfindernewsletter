@@ -5,33 +5,39 @@ const LOGO = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
 
 export default function ComingSoon() {
   const [email, setEmail]   = useState('')
-  const [status, setStatus] = useState('idle') // idle | loading | success | error
+  const [status, setStatus] = useState('idle') // idle | loading | success | dbError | validError
 
   async function handleSubmit() {
     const val = email.trim()
-    if (!val || !val.includes('@')) {
-      setStatus('error')
+    if (!val || !val.includes('@') || !val.includes('.')) {
+      setStatus('validError')
       setTimeout(() => setStatus('idle'), 1600)
       return
     }
 
     setStatus('loading')
 
-    const { error } = await supabase
-      .from('waitlist')
-      .insert([{ email: val }])
+    try {
+      const { error } = await supabase
+        .from('waitlist')
+        .insert([{ email: val }])
 
-    if (error) {
-      // 23505 = doublon unique, on traite comme succès
-      if (error.code === '23505') {
-        setStatus('success')
+      if (error) {
+        console.error('Supabase error:', error)
+        if (error.code === '23505') {
+          // doublon = déjà inscrit, on montre succès quand même
+          setStatus('success')
+        } else {
+          setStatus('dbError')
+          setTimeout(() => setStatus('idle'), 3000)
+        }
       } else {
-        console.error(error)
-        setStatus('error')
-        setTimeout(() => setStatus('idle'), 2000)
+        setStatus('success')
       }
-    } else {
-      setStatus('success')
+    } catch (err) {
+      console.error('Network error:', err)
+      setStatus('dbError')
+      setTimeout(() => setStatus('idle'), 3000)
     }
   }
 
@@ -62,7 +68,7 @@ export default function ComingSoon() {
                   onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                   placeholder="Votre adresse e-mail"
                   autoComplete="email"
-                  style={{ ...s.input, background: status === 'error' ? '#fff0f0' : '#f5f5f7' }}
+                  style={{ ...s.input, background: status === 'validError' ? '#fff0f0' : '#f5f5f7' }}
                 />
                 <button
                   onClick={handleSubmit}
@@ -72,8 +78,11 @@ export default function ComingSoon() {
                   {status === 'loading' ? '...' : 'Notifiez-moi'}
                 </button>
               </div>
-              {status === 'error' && (
+              {status === 'validError' && (
                 <p style={s.errMsg}>Veuillez entrer une adresse e-mail valide.</p>
+              )}
+              {status === 'dbError' && (
+                <p style={s.errMsg}>Une erreur est survenue, réessayez.</p>
               )}
             </>
           ) : (
@@ -119,7 +128,7 @@ const s = {
     width: '100%',
   },
   logo: {
-    height: '0px',
+    height: '34px',
     width: 'auto',
     marginBottom: '80px',
   },
