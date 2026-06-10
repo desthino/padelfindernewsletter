@@ -5,7 +5,7 @@ const LOGO = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
 
 export default function ComingSoon() {
   const [email, setEmail]   = useState('')
-  const [status, setStatus] = useState('idle') // idle | loading | success | dbError | validError
+  const [status, setStatus] = useState('idle')
 
   async function handleSubmit() {
     const val = email.trim()
@@ -18,24 +18,26 @@ export default function ComingSoon() {
     setStatus('loading')
 
     try {
+      // 1. Sauvegarde dans la table waitlist
       const { error } = await supabase
         .from('waitlist')
         .insert([{ email: val }])
 
-      if (error) {
+      if (error && error.code !== '23505') {
         console.error('Supabase error:', error)
-        if (error.code === '23505') {
-          // doublon = déjà inscrit, on montre succès quand même
-          setStatus('success')
-        } else {
-          setStatus('dbError')
-          setTimeout(() => setStatus('idle'), 3000)
-        }
-      } else {
-        setStatus('success')
+        setStatus('dbError')
+        setTimeout(() => setStatus('idle'), 3000)
+        return
       }
+
+      // 2. Envoie l'email de confirmation via la Edge Function
+      await supabase.functions.invoke('send-welcome-email', {
+        body: { record: { email: val } },
+      })
+
+      setStatus('success')
     } catch (err) {
-      console.error('Network error:', err)
+      console.error('Error:', err)
       setStatus('dbError')
       setTimeout(() => setStatus('idle'), 3000)
     }
